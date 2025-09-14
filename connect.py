@@ -1,30 +1,87 @@
 from collections import defaultdict
 import xml.etree.ElementTree as ET
-class Node(object):
+
+class Coordinates(object):
     def __init__(self, val = 0, lat = 0, long = 0):
         self.val = val
         self.lat = lat
         self.long = long
+
+class Properites:
+    def __init__(self, oneway = False):
+        self.oneway = oneway
+
         
-class Graph(object):
-    def connect(self, node):
+class Graph(Properites):
+    def connect(self, root):
         roads = defaultdict(list)
         coordinates = {}
+        oneway = set()
 
         w = 2
 
         while root[w].tag == "way":
-            for nd in root[w]:
-                if nd.tag == "nd":
-                    roads[int(root[w].get("id"))].append(int(nd.get("ref")))
+            nd_len = 0
+            for i in root[w]:
+                if i.tag == "nd":
+                    nd_len += 1
+                elif i.tag == "tag":
+                    if i.get("k") == "oneway" and i.get("v") == "yes":
+                        for nd in root[w]:
+                            if nd.tag == "nd":
+                                oneway.add(int(nd.get("ref")))
+                else:
+                    break
+            
+            for i in range(nd_len):
+                if root[w][i].tag == "nd" and nd_len > 1:
+                    
+                    if i > 0 and i < nd_len - 1:
+                        roads[int(root[w][i].get("ref"))].append(int(root[w][i - 1].get("ref")))
+                        roads[int(root[w][i].get("ref"))].append(int(root[w][i + 1].get("ref")))
+                        
+
+                    elif i == 0:
+                        roads[int(root[w][i].get("ref"))].append(int(root[w][i + 1].get("ref")))
+
+                    elif i == nd_len - 1:
+                        roads[int(root[w][i].get("ref"))].append(int(root[w][i - 1].get("ref")))
+                
+
             w += 1
         
         while w < len(root) and root[w].tag == "node":
             coordinates[int(root[w].get("id"))] = (float(root[w].get("lat")), float(root[w].get("lon")))
             w += 1
 
-        return coordinates
+        return roads
+
+source = 202176692
+end = 10127810693
+
+
+def bfs(source, end, roads):
+    from collections import deque
+    seen = set() 
+    seen.add(source)
+    q = deque()
+    q.append(source)
+
+
+    while q:
+        node = q.popleft()
+        for nei_node in roads[node]:
+            if nei_node not in seen:
+                seen.add(nei_node)
+                q.append(nei_node)
+                print(roads[node])
+                print("")
+                if nei_node == end:
+                    return True
+    return False
+
+            
     
 tree = ET.parse("Nashville_Chunck.osm")
 root = tree.getroot()
-print(Graph().connect(root))
+print(bfs(202176692, 1240363910, Graph().connect(root)))
