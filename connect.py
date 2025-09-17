@@ -16,21 +16,21 @@ class Graph(Properites):
     def connect(self, root):
         roads = defaultdict(list)
         coordinates = {}
-        oneway = set()
         oneway_index = {}
-
+        node_way = {}
         w = 2
 
         while root[w].tag == "way":
             nd_len = 0
             for i in root[w]:
                 if i.tag == "nd":
+                    node_way[int(i.get("ref"))] = int(root[w].get("id"))
                     nd_len += 1
                 elif i.tag == "tag":
                     if i.get("k") == "oneway" and i.get("v") == "yes":
-                        for nd in root[w]:
-                            if nd.tag == "nd":
-                                oneway.add(int(nd.get("ref")))
+                        for nd in range(len(root[w])):
+                            if root[w][nd].tag == "nd":
+                                oneway_index[int(root[w][nd].get("ref"))] = nd 
                 else:
                     break
             
@@ -55,13 +55,13 @@ class Graph(Properites):
             coordinates[int(root[w].get("id"))] = (float(root[w].get("lat")), float(root[w].get("lon")))
             w += 1
 
-        return roads, coordinates
+        return roads, coordinates, oneway_index, node_way
 
 source = 202176692
 end = 10127810693
 
 
-def bfs(source, end, roads, coordinates):
+def bfs(source, end, roads, coordinates, oneway_index, node_way):
     from collections import deque
     seen = set() 
     seen.add(source)
@@ -70,17 +70,46 @@ def bfs(source, end, roads, coordinates):
     parent = {source: None}
 
     path = []
+    path_found = False
     while q:
         node = q.popleft()
-        for nei_node in roads[node]:
-            if nei_node not in seen:
-                seen.add(nei_node)
-                q.append(nei_node)
-                path.append(nei_node)
-                parent[nei_node] = node
-                if nei_node == end:
-                    print(True)
-                    break
+
+        if node not in oneway_index:
+            for nei_node in roads[node]:
+                if nei_node not in seen:
+                    seen.add(nei_node)
+                    q.append(nei_node)
+                    path.append(nei_node)
+                    parent[nei_node] = node
+                    if nei_node == end:
+                        print(True)
+                        path_found = True
+                        break
+
+        elif node in oneway_index:
+            for nei_node in roads[node]:
+                if nei_node not in seen:
+                    if nei_node in oneway_index:
+                        if oneway_index[node] < oneway_index[nei_node]:
+                                seen.add(nei_node)
+                                q.append(nei_node)
+                                path.append(nei_node)
+                                parent[nei_node] = node
+                                if nei_node == end:
+                                    print(True)
+                                    path_found = True
+                                    break
+                    else:
+                        seen.add(nei_node)
+                        q.append(nei_node)
+                        path.append(nei_node)
+                        parent[nei_node] = node
+                        if nei_node == end:
+                            print(True)
+                            path_found = True
+                            break
+        if path_found:
+            break
 
     if end not in parent:
         return []
@@ -91,15 +120,14 @@ def bfs(source, end, roads, coordinates):
         path.append(cur)
         cur = parent[cur]
     path.reverse()
-    return path, coordinates
+    return path
 
 tree = ET.parse("Nashville_Chunck.osm")
 root = tree.getroot()
-filebruh = bfs(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1])
+filebruh = bfs(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2], Graph().connect(root)[3])
 
 def write_gpx(path, coordinates):
     for i in path:
         print(f"<trkpt lat=\"{coordinates[i][0]}\" lon=\"{coordinates[i][1]}\"/>")
             
-print(filebruh[0]) 
-
+print(filebruh)
