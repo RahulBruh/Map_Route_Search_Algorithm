@@ -17,14 +17,12 @@ class Graph(Properites):
         roads = defaultdict(list)
         coordinates = {}
         oneway_index = {}
-        node_way = {}
         w = 2
 
         while root[w].tag == "way":
             nd_len = 0
             for i in root[w]:
                 if i.tag == "nd":
-                    node_way[int(i.get("ref"))] = int(root[w].get("id"))
                     nd_len += 1
                 elif i.tag == "tag":
                     if i.get("k") == "oneway" and i.get("v") == "yes":
@@ -55,13 +53,13 @@ class Graph(Properites):
             coordinates[int(root[w].get("id"))] = (float(root[w].get("lat")), float(root[w].get("lon")))
             w += 1
 
-        return roads, coordinates, oneway_index, node_way
+        return roads, coordinates, oneway_index
 
 source = 202176692
 end = 10127810693
 
 
-def bfs(source, end, roads, coordinates, oneway_index, node_way):
+def bfs(source, end, roads, coordinates, oneway_index):
     from collections import deque
     seen = set() 
     seen.add(source)
@@ -120,14 +118,71 @@ def bfs(source, end, roads, coordinates, oneway_index, node_way):
         path.append(cur)
         cur = parent[cur]
     path.reverse()
-    return path
+    return path, coordinates
+
+def A_star(source, end, roads, coordinates, oneway_index):
+    import heapq
+    import math
+
+    def heuristic(source, end, coordinates):
+        lat1, lat2 = math.radians(coordinates[source][0]), math.radians(coordinates[end][0])
+        lon1, lon2 = math.radians(coordinates[source][1]), math.radians(coordinates[end][1])
+        radius = 3959
+        distance = (2*radius) * math.asin(math.sqrt(math.sin((lat2 - lat1)/ 2)**2) + math.cos(lat1) * math.sin((lon2 - lon1)/2)**2)
+        return distance
+
+    def cost(node1, node2, coordinates, currcost):
+        lat1, lat2 = math.radians(coordinates[node1][0]), math.radians(coordinates[node2][0])
+        lon1, lon2 = math.radians(coordinates[node1][1]), math.radians(coordinates[node2][1])
+        radius = 3959
+        distance = (2*radius) * math.asin(math.sqrt(math.sin((lat2 - lat1)/ 2)**2) + math.cos(lat1) * math.sin((lon2 - lon1)/2)**2)
+        return distance + currcost
+
+    seen = set()
+    seen.add(source)
+    open = []
+    heapq.heapify(open)
+    heapq.heappush(open, (0, source))
+    open.append((0, source))
+    parent = {source: None}
+    g_score = {source: 0}
+    h_score = {source: heuristic(source, end, coordinates)}
+    f_score = {source: g_score[source] + h_score[source]}
+
+    while open:
+        node = heapq.heappop(open)[1]
+
+        for nei_node in roads[node]:
+            if nei_node not in seen:
+                g_score[nei_node] = cost(node, nei_node, coordinates, g_score[node])
+                h_score[nei_node] = heuristic(nei_node, end, coordinates)
+                f_score[nei_node] = g_score[nei_node] + h_score[nei_node]
+                heapq.heappush(open, (f_score[nei_node], nei_node))
+                seen.add(nei_node)
+                parent[nei_node] = node
+                if nei_node == end:
+                    open = []
+                    print(True)
+                    break
+
+    if end not in parent:
+        return [], False
+    
+    path = []
+    cur = end
+    while cur is not None:
+        path.append(cur)
+        cur = parent[cur]
+    path.reverse()
+
+    return path, coordinates
 
 tree = ET.parse("Nashville_Chunck.osm")
 root = tree.getroot()
-filebruh = bfs(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2], Graph().connect(root)[3])
-
+#bfsbruh = bfs(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2])
+Abruh = A_star(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2])
 def write_gpx(path, coordinates):
     for i in path:
         print(f"<trkpt lat=\"{coordinates[i][0]}\" lon=\"{coordinates[i][1]}\"/>")
             
-print(filebruh)
+write_gpx(Abruh[0], Abruh[1])
