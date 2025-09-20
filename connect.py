@@ -20,7 +20,7 @@ class Graph(Properites):
         mph = {}
         w = 2
         road_type = {
-            "motorway": 65, "motorway_link": 45, "trunk": 55, "primary": 45, "primary_link": 40, "secondary": 40, "secondary_link": 35, "tertiary": 35, "tertiary_link": 30, "residential": 25, "living_street": 15, "service": 10, "alley": 10, "unclassified": 25, "track": 15, "footway": 0, "cycleway": 0, "path": 0, "pedestrian": 0, "construction": 0, "steps": 0
+            "motorway": 65, "motorway_link": 45, "trunk": 55, "primary": 45, "primary_link": 40, "secondary": 40, "secondary_link": 35, "tertiary": 35, "tertiary_link": 30, "residential": 25, "living_street": 15, "service": 10, "alley": 10, "unclassified": 25, "track": 15
         }
         while root[w].tag == "way":
             nd_len = 0
@@ -36,9 +36,20 @@ class Graph(Properites):
 
                     elif root[w][i].get("k") =="highway":
                         chuttey = root[w][i].get("v")
-                        for nd in range(len(root[w])):
-                            if root[w][nd].tag == "nd":
-                                mph[int(root[w][nd].get("ref"))] = road_type[chuttey]
+                        if chuttey not in road_type:
+                            pass
+                        elif chuttey in road_type:
+                            for nd in range(len(root[w])):
+                                if root[w][nd].tag == "nd":
+                                    if int(root[w][nd].get("ref")) not in mph:
+                                        mph[int(root[w][nd].get("ref"))] = road_type[chuttey]
+                                    else:
+                                        mph[int(root[w][nd].get("ref"))] = max(mph[int(root[w][nd].get("ref"))], road_type[chuttey])
+
+
+                    
+
+
 
 
                 else:
@@ -47,22 +58,22 @@ class Graph(Properites):
                 i += 1
 
             for i in range(nd_len):
-                if root[w][i].tag == "nd" and nd_len > 1:
+                if root[w][i].tag == "nd" and nd_len > 1 and int(root[w][i].get("ref")) in mph:
                     
                     if i > 0 and i < nd_len - 1:
                         ref1 = int(root[w][i - 1].get("ref"))
                         ref2 = int(root[w][i + 1].get("ref"))
-                        roads[int(root[w][i].get("ref"))].append(int(root[w][i - 1].get("ref"))) if mph[ref1] != 0 else None
-                        roads[int(root[w][i].get("ref"))].append(int(root[w][i + 1].get("ref"))) if mph[ref2] != 0 else None
+                        roads[int(root[w][i].get("ref"))].append(int(root[w][i - 1].get("ref"))) if ref1 in mph  else None
+                        roads[int(root[w][i].get("ref"))].append(int(root[w][i + 1].get("ref"))) if ref2 in mph else None
                         
 
                     elif i == 0:
                         ref1 = int(root[w][i + 1].get("ref"))
-                        roads[int(root[w][i].get("ref"))].append(int(root[w][i + 1].get("ref"))) if mph[ref1] != 0 else None
+                        roads[int(root[w][i].get("ref"))].append(int(root[w][i + 1].get("ref"))) if ref1 in mph else None
 
                     elif i == nd_len - 1:
                         ref1 = int(root[w][i - 1].get("ref"))
-                        roads[int(root[w][i].get("ref"))].append(int(root[w][i - 1].get("ref"))) if mph[ref1] != 0 else None
+                        roads[int(root[w][i].get("ref"))].append(int(root[w][i - 1].get("ref"))) if ref1 in mph else None
                  
 
             w += 1
@@ -71,8 +82,7 @@ class Graph(Properites):
             coordinates[int(root[w].get("id"))] = (float(root[w].get("lat")), float(root[w].get("lon")))
             w += 1
 
-        print(mph)
-        return roads, coordinates, oneway_index
+        return roads, coordinates, oneway_index, mph
 
 source = 202176692
 end = 10127810693
@@ -139,7 +149,7 @@ def bfs(source, end, roads, coordinates, oneway_index):
     path.reverse()
     return path, coordinates
 
-def A_star(source, end, roads, coordinates, oneway_index):
+def A_star(source, end, roads, coordinates, oneway_index, mph):
     import heapq
     import math
 
@@ -176,7 +186,7 @@ def A_star(source, end, roads, coordinates, oneway_index):
                 g_score[nei_node] = cost(node, nei_node, coordinates, g_score[node])
                 h_score[nei_node] = heuristic(nei_node, end, coordinates)
                 f_score[nei_node] = g_score[nei_node] + h_score[nei_node]
-                heapq.heappush(open, (f_score[nei_node], nei_node))
+                heapq.heappush(open, (f_score[nei_node]/mph[nei_node], nei_node))
                 seen.add(nei_node)
                 parent[nei_node] = node
                 if nei_node == end:
@@ -199,7 +209,7 @@ def A_star(source, end, roads, coordinates, oneway_index):
 tree = ET.parse("Nashville_Chunck.osm")
 root = tree.getroot()
 bfsbruh = bfs(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2])
-Abruh = A_star(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2])
+Abruh = A_star(202176692, 5741054510, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2], Graph().connect(root)[3])
 def write_gpx(path, coordinates):
     for i in path:
         print(f"<trkpt lat=\"{coordinates[i][0]}\" lon=\"{coordinates[i][1]}\"/>")
