@@ -4,7 +4,7 @@ Finding the fastest route from one location to another using different search al
 OSM Pathfinding with Python
 📌 Overview
 
-This project parses OpenStreetMap (.osm) data into a graph structure and runs search algorithms (like BFS / A* ) to find paths between points.
+This project parses OpenStreetMap (.osm) data into a graph structure and runs search algorithms (like DFS, BFS, Greedy, Dijkstra, A*) to find paths between points.
 The graph is built from ways and nodes:
 
 Ways = roads (e.g., "Cleveland Avenue")
