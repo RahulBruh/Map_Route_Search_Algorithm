@@ -211,7 +211,25 @@ root = tree.getroot()
 bfsbruh = bfs(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2])
 Abruh = A_star(202176692, 5741054510, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2], Graph().connect(root)[3])
 def write_gpx(path, coordinates):
-    for i in path:
-        print(f"<trkpt lat=\"{coordinates[i][0]}\" lon=\"{coordinates[i][1]}\"/>")
+    with open("path.gpx", "w") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        f.write('<gpx version="1.1" creator="ChatGPT">\n')
+        f.write(f'  <wpt lat="{coordinates[path[0]][0]}" lon="{coordinates[path[0]][1]}"><name>Start</name></wpt>\n')
+        f.write("    <name>Start</name>\n")
+        f.write('  </wpt>')
+
+        f.write(f'  <wpt lat="{coordinates[path[-1]][0]}" lon="{coordinates[path[-1]][1]}"><name>End</name></wpt>\n')
+        f.write("    <name>End</name>\n")
+        f.write('  </wpt>\n')
+
+        f.write('  <trk>\n')
+        f.write('    <name>path</name>\n')
+        f.write('    <trkseg>')
+        for i in path:
+            f.write(f"      <trkpt lat=\"{coordinates[i][0]}\" lon=\"{coordinates[i][1]}\"/>\n")
+        f.write('    </trkseg>\n')
+        f.write('  </trk>\n')
+        f.write('</gpx>\n')
+
             
 write_gpx(Abruh[0], Abruh[1])

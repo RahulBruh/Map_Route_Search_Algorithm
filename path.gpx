@@ -1,20 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="ManualNotepad">
-
-  <!-- Start marker -->
-  <wpt lat="36.1477561" lon="-86.7435002">
-    <name>START</name>
+<gpx version="1.1" creator="ChatGPT">
+  <wpt lat="36.1477561" lon="-86.7435002"><name>Start</name></wpt>
+    <name>Start</name>
+  </wpt>  <wpt lat="36.1558807" lon="-86.7770902"><name>End</name></wpt>
+    <name>End</name>
   </wpt>
-
-  <!-- End marker -->
-  <wpt lat="36.1558807" lon="-86.7770902">
-    <name>END</name>
-  </wpt>
-
   <trk>
     <name>path</name>
-    <trkseg>
-      <trkpt lat="36.1477561" lon="-86.7435002"/>
+    <trkseg>      <trkpt lat="36.1477561" lon="-86.7435002"/>
       <trkpt lat="36.1478365" lon="-86.743875"/>
       <trkpt lat="36.1480024" lon="-86.744442"/>
       <trkpt lat="36.1481872" lon="-86.7448951"/>
