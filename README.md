@@ -7,6 +7,9 @@ OSM Pathfinding with Python
 This project parses OpenStreetMap (.osm) data into a graph structure and runs search algorithms (like DFS, BFS, Greedy, Dijkstra, A*) to find paths between points.
 The graph is built from ways and nodes:
 
+Open JOSM and upload the nashville osm map and pick and two node adresses, upload those into the python file and run connect.py, this will rewrite path.gpx and open 
+path.gpx over the Nashville osm file adn you will see the fasest route.
+
 Ways = roads (e.g., "Cleveland Avenue")
 
 Nodes = points along those roads (lat/lon coordinates)
