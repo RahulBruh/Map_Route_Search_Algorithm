@@ -1,235 +1,228 @@
-from collections import defaultdict
+"""Route search over OpenStreetMap road data (downtown Nashville).
+
+Parses an .osm file into an adjacency list and finds a route between two
+node ids with BFS, DFS, Dijkstra, or A*. The route is written to path.gpx so
+it can be overlaid on the map in JOSM.
+
+Usage:
+    python connect.py --algo astar --source 202176692 --end 5741054510
+    python connect.py --algo all            # run and compare every algorithm
+"""
+import argparse
+import heapq
+import math
+import time
 import xml.etree.ElementTree as ET
+from collections import defaultdict, deque
 
-class Coordinates(object):
-    def __init__(self, val = 0, lat = 0, long = 0):
-        self.val = val
-        self.lat = lat
-        self.long = long
+EARTH_RADIUS_MILES = 3959
 
-class Properites:
-    def __init__(self, oneway = False):
-        self.oneway = oneway
-
-        
-class Graph(Properites):
-    def connect(self, root):
-        roads = defaultdict(list)
-        coordinates = {}
-        oneway_index = {}
-        mph = {}
-        w = 2
-        road_type = {
-            "motorway": 65, "motorway_link": 45, "trunk": 55, "primary": 45, "primary_link": 40, "secondary": 40, "secondary_link": 35, "tertiary": 35, "tertiary_link": 30, "residential": 25, "living_street": 15, "service": 10, "alley": 10, "unclassified": 25, "track": 15
-        }
-        while root[w].tag == "way":
-            nd_len = 0
-            i = 0
-            while i < len(root[w]):
-                if root[w][i].tag == "nd":
-                    nd_len += 1
-                elif root[w][i].tag == "tag":
-                    if root[w][i].get("k") == "oneway" and root[w][i].get("v") == "yes":
-                        for nd in range(len(root[w])):
-                            if root[w][nd].tag == "nd":
-                                oneway_index[int(root[w][nd].get("ref"))] = nd
-
-                    elif root[w][i].get("k") =="highway":
-                        chuttey = root[w][i].get("v")
-                        if chuttey not in road_type:
-                            pass
-                        elif chuttey in road_type:
-                            for nd in range(len(root[w])):
-                                if root[w][nd].tag == "nd":
-                                    if int(root[w][nd].get("ref")) not in mph:
-                                        mph[int(root[w][nd].get("ref"))] = road_type[chuttey]
-                                    else:
-                                        mph[int(root[w][nd].get("ref"))] = max(mph[int(root[w][nd].get("ref"))], road_type[chuttey])
+ROAD_SPEEDS_MPH = {
+    "motorway": 65, "motorway_link": 45, "trunk": 55, "primary": 45,
+    "primary_link": 40, "secondary": 40, "secondary_link": 35,
+    "tertiary": 35, "tertiary_link": 30, "residential": 25,
+    "living_street": 15, "service": 10, "alley": 10, "unclassified": 25,
+    "track": 15,
+}
+MAX_SPEED_MPH = max(ROAD_SPEEDS_MPH.values())
 
 
-                    
+class Graph:
+    """Road network: adjacency list, node coordinates and per-node speed."""
+
+    def __init__(self, roads=None, coordinates=None, mph=None):
+        self.roads = roads if roads is not None else defaultdict(list)
+        self.coordinates = coordinates if coordinates is not None else {}
+        self.mph = mph if mph is not None else {}
+
+    @classmethod
+    def from_osm(cls, path):
+        root = ET.parse(path).getroot()
+        graph = cls()
+
+        for node in root.iter("node"):
+            graph.coordinates[int(node.get("id"))] = (
+                float(node.get("lat")), float(node.get("lon")))
+
+        for way in root.iter("way"):
+            tags = {t.get("k"): t.get("v") for t in way.iter("tag")}
+            speed = ROAD_SPEEDS_MPH.get(tags.get("highway"))
+            if speed is None:
+                continue  # not a drivable road
+            refs = [int(nd.get("ref")) for nd in way.iter("nd")]
+            refs = [r for r in refs if r in graph.coordinates]
+            oneway = tags.get("oneway")
+            if oneway == "-1":
+                refs.reverse()
+            forward_only = oneway in ("yes", "true", "1", "-1")
+
+            for ref in refs:
+                graph.mph[ref] = max(graph.mph.get(ref, 0), speed)
+            for a, b in zip(refs, refs[1:]):
+                graph.roads[a].append(b)
+                if not forward_only:
+                    graph.roads[b].append(a)
+        return graph
+
+    def distance(self, a, b):
+        """Great-circle (haversine) distance in miles."""
+        lat1, lon1 = map(math.radians, self.coordinates[a])
+        lat2, lon2 = map(math.radians, self.coordinates[b])
+        h = (math.sin((lat2 - lat1) / 2) ** 2
+             + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2)
+        return 2 * EARTH_RADIUS_MILES * math.asin(math.sqrt(h))
+
+    def travel_time(self, a, b):
+        """Hours to drive edge a->b at the slower of the two nodes' speeds."""
+        speed = min(self.mph.get(a, MAX_SPEED_MPH), self.mph.get(b, MAX_SPEED_MPH))
+        return self.distance(a, b) / speed
 
 
-
-
-                else:
-                    break
-
-                i += 1
-
-            for i in range(nd_len):
-                if root[w][i].tag == "nd" and nd_len > 1 and int(root[w][i].get("ref")) in mph:
-                    
-                    if i > 0 and i < nd_len - 1:
-                        ref1 = int(root[w][i - 1].get("ref"))
-                        ref2 = int(root[w][i + 1].get("ref"))
-                        roads[int(root[w][i].get("ref"))].append(int(root[w][i - 1].get("ref"))) if ref1 in mph  else None
-                        roads[int(root[w][i].get("ref"))].append(int(root[w][i + 1].get("ref"))) if ref2 in mph else None
-                        
-
-                    elif i == 0:
-                        ref1 = int(root[w][i + 1].get("ref"))
-                        roads[int(root[w][i].get("ref"))].append(int(root[w][i + 1].get("ref"))) if ref1 in mph else None
-
-                    elif i == nd_len - 1:
-                        ref1 = int(root[w][i - 1].get("ref"))
-                        roads[int(root[w][i].get("ref"))].append(int(root[w][i - 1].get("ref"))) if ref1 in mph else None
-                 
-
-            w += 1
-        
-        while w < len(root) and root[w].tag == "node":
-            coordinates[int(root[w].get("id"))] = (float(root[w].get("lat")), float(root[w].get("lon")))
-            w += 1
-
-        return roads, coordinates, oneway_index, mph
-
-source = 202176692
-end = 10127810693
-
-
-def bfs(source, end, roads, coordinates, oneway_index):
-    from collections import deque
-    seen = set() 
-    seen.add(source)
-    q = deque()
-    q.append(source)
-    parent = {source: None}
-
-    path = []
-    path_found = False
-    while q:
-        node = q.popleft()
-
-        if node not in oneway_index:
-            for nei_node in roads[node]:
-                if nei_node not in seen:
-                    seen.add(nei_node)
-                    q.append(nei_node)
-                    path.append(nei_node)
-                    parent[nei_node] = node
-                    if nei_node == end:
-                        print(True)
-                        path_found = True
-                        break
-
-        elif node in oneway_index:
-            for nei_node in roads[node]:
-                if nei_node not in seen:
-                    if nei_node in oneway_index:
-                        if oneway_index[node] < oneway_index[nei_node]:
-                                seen.add(nei_node)
-                                q.append(nei_node)
-                                path.append(nei_node)
-                                parent[nei_node] = node
-                                if nei_node == end:
-                                    print(True)
-                                    path_found = True
-                                    break
-                    else:
-                        seen.add(nei_node)
-                        q.append(nei_node)
-                        path.append(nei_node)
-                        parent[nei_node] = node
-                        if nei_node == end:
-                            print(True)
-                            path_found = True
-                            break
-        if path_found:
-            break
-
+def _reconstruct(parent, end):
     if end not in parent:
         return []
-
-    path = []
-    cur = end
+    path, cur = [], end
     while cur is not None:
         path.append(cur)
         cur = parent[cur]
-    path.reverse()
-    return path, coordinates
+    return path[::-1]
 
-def A_star(source, end, roads, coordinates, oneway_index, mph):
-    import heapq
-    import math
 
-    def heuristic(source, end, coordinates):
-        lat1, lat2 = math.radians(coordinates[source][0]), math.radians(coordinates[end][0])
-        lon1, lon2 = math.radians(coordinates[source][1]), math.radians(coordinates[end][1])
-        radius = 3959
-        distance = (2*radius) * math.asin(math.sqrt(math.sin((lat2 - lat1)/ 2)**2) + math.cos(lat1) * math.sin((lon2 - lon1)/2)**2)
-        return distance
-
-    def cost(node1, node2, coordinates, currcost):
-        lat1, lat2 = math.radians(coordinates[node1][0]), math.radians(coordinates[node2][0])
-        lon1, lon2 = math.radians(coordinates[node1][1]), math.radians(coordinates[node2][1])
-        radius = 3959
-        distance = (2*radius) * math.asin(math.sqrt(math.sin((lat2 - lat1)/ 2)**2) + math.cos(lat1) * math.sin((lon2 - lon1)/2)**2)
-        return distance + currcost
-
-    seen = set()
-    seen.add(source)
-    open = []
-    heapq.heapify(open)
-    heapq.heappush(open, (0, source))
-    open.append((0, source))
+def bfs(graph, source, end):
+    """Fewest road segments. Returns (path, nodes_expanded)."""
     parent = {source: None}
-    g_score = {source: 0}
-    h_score = {source: heuristic(source, end, coordinates)}
-    f_score = {source: g_score[source] + h_score[source]}
+    queue = deque([source])
+    expanded = 0
+    while queue:
+        node = queue.popleft()
+        expanded += 1
+        if node == end:
+            break
+        for nei in graph.roads[node]:
+            if nei not in parent:
+                parent[nei] = node
+                queue.append(nei)
+    return _reconstruct(parent, end), expanded
 
-    while open:
-        node = heapq.heappop(open)[1]
 
-        for nei_node in roads[node]:
-            if nei_node not in seen:
-                g_score[nei_node] = cost(node, nei_node, coordinates, g_score[node])
-                h_score[nei_node] = heuristic(nei_node, end, coordinates)
-                f_score[nei_node] = g_score[nei_node] + h_score[nei_node]
-                heapq.heappush(open, (f_score[nei_node]/mph[nei_node], nei_node))
-                seen.add(nei_node)
-                parent[nei_node] = node
-                if nei_node == end:
-                    open = []
-                    print(True)
-                    break
+def dfs(graph, source, end):
+    """Any route (not optimal); iterative to avoid recursion limits."""
+    parent = {source: None}
+    stack = [source]
+    visited = set()
+    expanded = 0
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        expanded += 1
+        if node == end:
+            break
+        for nei in graph.roads[node]:
+            if nei not in visited:
+                parent[nei] = node
+                stack.append(nei)
+    if end not in visited:
+        return [], expanded
+    return _reconstruct(parent, end), expanded
 
-    if end not in parent:
-        return [], False
-    
-    path = []
-    cur = end
-    while cur is not None:
-        path.append(cur)
-        cur = parent[cur]
-    path.reverse()
 
-    return path, coordinates
+def _best_first(graph, source, end, heuristic):
+    """Shared Dijkstra / A* core, minimising travel time."""
+    g = {source: 0.0}
+    parent = {source: None}
+    open_heap = [(heuristic(source), source)]
+    closed = set()
+    expanded = 0
+    while open_heap:
+        _, node = heapq.heappop(open_heap)
+        if node in closed:
+            continue
+        closed.add(node)
+        expanded += 1
+        if node == end:
+            break
+        for nei in graph.roads[node]:
+            if nei in closed:
+                continue
+            cost = g[node] + graph.travel_time(node, nei)
+            if cost < g.get(nei, math.inf):
+                g[nei] = cost
+                parent[nei] = node
+                heapq.heappush(open_heap, (cost + heuristic(nei), nei))
+    if end not in closed:
+        return [], expanded
+    return _reconstruct(parent, end), expanded
 
-tree = ET.parse("Nashville_Chunck.osm")
-root = tree.getroot()
-bfsbruh = bfs(202176692, 7740969065, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2])
-Abruh = A_star(202176692, 5741054510, Graph().connect(root)[0], Graph().connect(root)[1], Graph().connect(root)[2], Graph().connect(root)[3])
-def write_gpx(path, coordinates):
-    with open("path.gpx", "w") as f:
+
+def dijkstra(graph, source, end):
+    """Fastest route by travel time."""
+    return _best_first(graph, source, end, lambda n: 0.0)
+
+
+def a_star(graph, source, end):
+    """Fastest route; straight-line distance at top speed is admissible."""
+    return _best_first(graph, source, end,
+                       lambda n: graph.distance(n, end) / MAX_SPEED_MPH)
+
+
+ALGORITHMS = {"bfs": bfs, "dfs": dfs, "dijkstra": dijkstra, "astar": a_star}
+
+
+def route_stats(graph, path):
+    miles = sum(graph.distance(a, b) for a, b in zip(path, path[1:]))
+    minutes = 60 * sum(graph.travel_time(a, b) for a, b in zip(path, path[1:]))
+    return miles, minutes
+
+
+def write_gpx(path, coordinates, filename="path.gpx"):
+    start, end = coordinates[path[0]], coordinates[path[-1]]
+    with open(filename, "w") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-        f.write('<gpx version="1.1" creator="ChatGPT">\n')
-        f.write(f'  <wpt lat="{coordinates[path[0]][0]}" lon="{coordinates[path[0]][1]}"><name>Start</name></wpt>\n')
-        f.write("    <name>Start</name>\n")
-        f.write('  </wpt>')
+        f.write('<gpx version="1.1" creator="Map_Route_Search_Algorithm">\n')
+        f.write(f'  <wpt lat="{start[0]}" lon="{start[1]}"><name>Start</name></wpt>\n')
+        f.write(f'  <wpt lat="{end[0]}" lon="{end[1]}"><name>End</name></wpt>\n')
+        f.write('  <trk>\n    <name>path</name>\n    <trkseg>\n')
+        for node in path:
+            lat, lon = coordinates[node]
+            f.write(f'      <trkpt lat="{lat}" lon="{lon}"/>\n')
+        f.write('    </trkseg>\n  </trk>\n</gpx>\n')
 
-        f.write(f'  <wpt lat="{coordinates[path[-1]][0]}" lon="{coordinates[path[-1]][1]}"><name>End</name></wpt>\n')
-        f.write("    <name>End</name>\n")
-        f.write('  </wpt>\n')
 
-        f.write('  <trk>\n')
-        f.write('    <name>path</name>\n')
-        f.write('    <trkseg>')
-        for i in path:
-            f.write(f"      <trkpt lat=\"{coordinates[i][0]}\" lon=\"{coordinates[i][1]}\"/>\n")
-        f.write('    </trkseg>\n')
-        f.write('  </trk>\n')
-        f.write('</gpx>\n')
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--osm", default="Nashville_Chunck.osm")
+    parser.add_argument("--source", type=int, default=202176692)
+    parser.add_argument("--end", type=int, default=5741054510)
+    parser.add_argument("--algo", choices=[*ALGORITHMS, "all"], default="astar")
+    parser.add_argument("--gpx", default="path.gpx")
+    args = parser.parse_args()
 
-            
-write_gpx(Abruh[0], Abruh[1])
+    graph = Graph.from_osm(args.osm)
+    print(f"Loaded {len(graph.coordinates):,} nodes, "
+          f"{sum(map(len, graph.roads.values())):,} directed road segments")
+
+    names = list(ALGORITHMS) if args.algo == "all" else [args.algo]
+    best = None
+    for name in names:
+        t0 = time.perf_counter()
+        path, expanded = ALGORITHMS[name](graph, args.source, args.end)
+        ms = (time.perf_counter() - t0) * 1000
+        if not path:
+            print(f"{name:>8}: no route found ({expanded:,} nodes expanded, {ms:.1f} ms)")
+            continue
+        miles, minutes = route_stats(graph, path)
+        print(f"{name:>8}: {len(path):,} nodes, {miles:.2f} mi, {minutes:.1f} min drive, "
+              f"{expanded:,} expanded, {ms:.1f} ms")
+        if best is None or name == args.algo or name == "astar":
+            best = path
+
+    if best:
+        write_gpx(best, graph.coordinates, args.gpx)
+        print(f"Wrote {args.gpx}")
+
+
+if __name__ == "__main__":
+    main()

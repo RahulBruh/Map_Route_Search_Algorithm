@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pathfinding Visualizer — BFS / DFS / Dijkstra / A*</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Pathfinding Visualizer</h1>
+    <p class="subtitle">Watch BFS, DFS, Dijkstra, and A* search a grid in real time.</p>
+  </header>
+
+  <div class="controls">
+    <label for="algo">Algorithm</label>
+    <select id="algo">
+      <option value="bfs">Breadth-First Search</option>
+      <option value="dfs">Depth-First Search</option>
+      <option value="dijkstra">Dijkstra</option>
+      <option value="astar" selected>A* Search</option>
+    </select>
+
+    <button id="visualize-btn">Visualize!</button>
+    <button id="clear-walls-btn">Clear Walls</button>
+    <button id="clear-path-btn">Clear Path</button>
+    <button id="maze-btn">Random Maze</button>
+
+    <label for="speed">Speed</label>
+    <select id="speed">
+      <option value="5">Fast</option>
+      <option value="15" selected>Normal</option>
+      <option value="40">Slow</option>
+    </select>
+  </div>
+
+  <div class="legend">
+    <span><i class="swatch start"></i> Start</span>
+    <span><i class="swatch end"></i> End</span>
+    <span><i class="swatch wall"></i> Wall</span>
+    <span><i class="swatch visited"></i> Visited</span>
+    <span><i class="swatch path"></i> Shortest Path</span>
+  </div>
+
+  <div id="status" class="status">Drag the start/end nodes, click to draw walls, then press Visualize.</div>
+
+  <div id="grid" class="grid"></div>
+
+  <footer>
+    <p>Part of the <a href="https://github.com/RahulBruh/map_route_search_algorithm" target="_blank" rel="noopener">Map Route Search Algorithm</a> project — the same BFS/DFS/Dijkstra/A* logic applied earlier to real OpenStreetMap road data for downtown Nashville.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

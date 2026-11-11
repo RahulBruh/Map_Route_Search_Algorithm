@@ -1,29 +1,46 @@
-# Map_Route_Search_Algorithm
-Finding the fastest route from one location to another using different search alogirhtms, and visually show the differences between each search alogirthm.
+# Map Route Search Algorithm
 
-OSM Pathfinding with Python
-📌 Overview
+Finding the fastest route between two points on real OpenStreetMap road data for downtown Nashville, and comparing how BFS, DFS, Dijkstra, and A* search.
 
-This project parses OpenStreetMap (.osm) data into a graph structure and runs search algorithms (like DFS, BFS, Greedy, Dijkstra, A*) to find paths between points.
-The graph is built from ways and nodes:
+## 🎮 Live Demo
 
-Open JOSM and upload the nashville osm map and pick and two node adresses, upload those into the python file and run connect.py, this will rewrite path.gpx and open 
-path.gpx over the Nashville osm file adn you will see the fasest route.
+[**Try the interactive visualizer →**](https://rahulbruh.github.io/map_route_search_algorithm/)
 
-Ways = roads (e.g., "Cleveland Avenue")
+Pick BFS, DFS, Dijkstra, or A*, draw walls, drag the start and end nodes, and watch each algorithm search the grid step by step. The demo source is in [`/docs`](./docs).
 
-Nodes = points along those roads (lat/lon coordinates)
+## Overview
 
-Supports handling oneway streets, intersections, and exporting results to GPX so they can be visualized in JOSM or other map editors.
+`connect.py` parses an `.osm` file into a graph:
 
-⚡ Features
+- **Ways** = roads (e.g. "Cleveland Avenue"), filtered to drivable `highway` types with a speed per road class
+- **Nodes** = points along those roads (lat/lon)
 
-Parse .osm XML files into a Python graph.
+It handles `oneway=yes/-1`, builds an adjacency list, runs a search, and exports the route as GPX so you can overlay it on the map in JOSM.
 
-Build adjacency lists from <way> and <nd> references.
+| Algorithm | Optimises | Notes |
+|-----------|-----------|-------|
+| BFS | fewest road segments | unweighted |
+| DFS | nothing (finds *a* route) | shows why uninformed depth-first is a bad router |
+| Dijkstra | travel time | edge cost = haversine distance ÷ road speed |
+| A* | travel time | heuristic = straight-line distance at top speed (admissible) |
 
-Support for oneway=yes / no / -1 and defaults.
+Sample run on the included Nashville data:
 
-Run BFS (and extendable to A*, Dijkstra, etc.) for pathfinding.
+```
+     bfs: 81 nodes, 2.38 mi, 3.2 min drive, 9,136 expanded
+     dfs: 1,611 nodes, 27.02 mi, 103.1 min drive, 34,982 expanded
+dijkstra: 117 nodes, 2.20 mi, 2.9 min drive, 7,857 expanded
+   astar: 117 nodes, 2.20 mi, 2.9 min drive, 2,458 expanded
+```
 
-Export results as GPX tracks for visualization in JOSM.
+A* finds the same fastest route as Dijkstra while expanding about 3× fewer nodes.
+
+## Usage
+
+```bash
+python connect.py --algo astar --source 202176692 --end 5741054510
+python connect.py --algo all        # compare every algorithm
+python -m pytest                    # unit tests
+```
+
+Then open `Nashville_Chunck.osm` in JOSM (`josm-tested.jar` is included) and load `path.gpx` on top of it to see the route. To pick your own endpoints, select two nodes in JOSM and pass their ids as `--source` and `--end`.
