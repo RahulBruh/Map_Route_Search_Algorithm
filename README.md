@@ -4,9 +4,9 @@ Finding the fastest route between two points on real OpenStreetMap road data for
 
 ## 🎮 Live Demo
 
-[**Try the interactive visualizer →**](https://rahulbruh.github.io/map_route_search_algorithm/)
+[**Try the interactive visualizer →**](https://rahulmoka.com/projects/astar-route-search)
 
-Pick BFS, DFS, Dijkstra, or A*, draw walls, drag the start and end nodes, and watch each algorithm search the grid step by step. The demo source is in [`/docs`](./docs).
+Pick BFS, DFS, Dijkstra, or A*, draw walls and weighted traffic, drag the start and end nodes, and watch each algorithm search the grid step by step. A dependency-free standalone version lives in [`/docs`](./docs): open `docs/index.html` in a browser, or serve it with GitHub Pages (Settings → Pages → `main` / `/docs`).
 
 ## Overview
 
